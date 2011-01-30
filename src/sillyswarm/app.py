@@ -16,11 +16,13 @@
 """Silly Swarm is a simple multiplayer game using Web Sockets."""
 
 from django.utils import simplejson
+from google.appengine.api import memcache
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from typhoonae import websocket
 from uuid import uuid4 as UUID
+import logging
 
 
 # Successfully completed handshake
@@ -31,6 +33,9 @@ PLAYER_MOVED = 2
 
 # A player left the game
 PLAYER_LEFT = 3
+
+# Key name for keeping track of online players
+PLAYERS_INDEX_KEY = "players"
 
 
 class MainHandler(webapp.RequestHandler):
@@ -51,8 +56,29 @@ class HandshakeHandler(webapp.RequestHandler):
 
         message = websocket.Message(self.request.POST)
 
+        players = memcache.get(PLAYERS_INDEX_KEY)
+
+        present_players = []
+
+        if players:
+            present_players = players[:]
+            players.append(path)
+            memcache.replace(PLAYERS_INDEX_KEY, players)
+        else:
+            players = [path]
+            memcache.set(PLAYERS_INDEX_KEY, players)
+
+        memcache.set(path, [])
+
         response = {'state': HANDSHAKE_RECEIVED, 'player': path}
         websocket.send_message([message.socket], simplejson.dumps(response))
+
+        player_data = memcache.get_multi(present_players)
+
+        for player in player_data:
+            x, y = player_data[player]
+            response = {'state': PLAYER_MOVED, 'player': player, 'x': x, 'y': y}
+            websocket.send_message([message.socket], simplejson.dumps(response))
 
 
 class MessageHandler(webapp.RequestHandler):
@@ -70,8 +96,10 @@ class MessageHandler(webapp.RequestHandler):
         y = data.get('y')
 
         if state == PLAYER_MOVED:
+            memcache.replace(path, [x, y])
             response = {'state': PLAYER_MOVED, 'player': path, 'x': x, 'y': y}
         elif state == PLAYER_LEFT or not data:
+            memcache.delete(path)
             response = {'state': PLAYER_LEFT, 'player': path}
 
         websocket.broadcast_message(simplejson.dumps(response))
