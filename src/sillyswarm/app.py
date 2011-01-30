@@ -23,6 +23,7 @@ from google.appengine.ext.webapp import util
 from typhoonae import websocket
 from uuid import uuid4 as UUID
 import logging
+import os
 
 
 # Successfully completed handshake
@@ -45,7 +46,8 @@ class MainHandler(webapp.RequestHandler):
         """Creates a Web Socket URL and renders the index template."""
 
         websocket_url = websocket.create_websocket_url('/%s' % UUID())
-        self.response.out.write(template.render('index.html', locals()))
+        template_path = os.path.join(os.path.dirname(__file__), "index.html")
+        self.response.out.write(template.render(template_path, locals()))
 
 
 class HandshakeHandler(webapp.RequestHandler):
