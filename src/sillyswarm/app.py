@@ -78,8 +78,10 @@ class HandshakeHandler(webapp.RequestHandler):
         for player in player_data:
             if not player_data[player]:
                 continue
+
             x, y = player_data[player]
             response = {'state': PLAYER_MOVED, 'player': player, 'x': x, 'y': y}
+
             websocket.send_message([message.socket], simplejson.dumps(response))
 
 
@@ -97,11 +99,25 @@ class MessageHandler(webapp.RequestHandler):
         x = data.get('x')
         y = data.get('y')
 
+        players = memcache.get(PLAYERS_INDEX_KEY) or []
+
         if state == PLAYER_MOVED:
-            memcache.replace(path, [x, y])
+            replace = {path: [x, y]}
+
+            if path not in players:
+                players.append()
+                replace[PLAYERS_INDEX_KEY] = players
+
+            memcache.replace_multi(replace)
             response = {'state': PLAYER_MOVED, 'player': path, 'x': x, 'y': y}
+
         elif state == PLAYER_LEFT or not data:
             memcache.delete(path)
+
+            if path in players:
+                players.remove(path)
+                memcache.replace(PLAYERS_INDEX_KEY, players)
+
             response = {'state': PLAYER_LEFT, 'player': path}
 
         websocket.broadcast_message(simplejson.dumps(response))
