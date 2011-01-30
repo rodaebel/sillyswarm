@@ -1,18 +1,18 @@
 diff -r -upN google_appengine/dev_appserver.py google_appengine/dev_appserver.py
---- google_appengine/dev_appserver.py	2010-12-01 19:42:14.000000000 +0100
-+++ google_appengine/dev_appserver.py	2010-12-15 13:19:03.000000000 +0100
-@@ -44,6 +44,8 @@ EXTRA_PATHS = [
-   os.path.join(DIR_PATH, 'lib', 'ipaddr'),
-   os.path.join(DIR_PATH, 'lib', 'webob'),
+--- google_appengine/dev_appserver.py	2010-12-16 00:06:19.000000000 +0100
++++ google_appengine/dev_appserver.py	2011-01-30 19:35:02.000000000 +0100
+@@ -46,6 +46,8 @@ EXTRA_PATHS = [
    os.path.join(DIR_PATH, 'lib', 'yaml', 'lib'),
+   os.path.join(DIR_PATH, 'lib', 'simplejson'),
+   os.path.join(DIR_PATH, 'lib', 'graphy'),
 +  os.path.join(DIR_PATH, 'lib', 'tornado'),
 +  os.path.join(DIR_PATH, 'lib', 'typhoonae'),
  ]
  
  SCRIPT_EXCEPTIONS = {
 diff -r -upN google_appengine/google/appengine/tools/dev_appserver.py google_appengine/google/appengine/tools/dev_appserver.py
---- google_appengine/google/appengine/tools/dev_appserver.py	2010-12-01 19:42:14.000000000 +0100
-+++ google_appengine/google/appengine/tools/dev_appserver.py	2010-12-15 13:21:12.000000000 +0100
+--- google_appengine/google/appengine/tools/dev_appserver.py	2010-12-16 00:06:19.000000000 +0100
++++ google_appengine/google/appengine/tools/dev_appserver.py	2011-01-30 19:41:02.000000000 +0100
 @@ -116,6 +116,8 @@ from google.appengine.tools import dev_a
  from google.appengine.tools import dev_appserver_oauth
  from google.appengine.tools import dev_appserver_upload
