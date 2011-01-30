@@ -21,12 +21,12 @@ skip_files:
 
 handlers:
 
-- url: /(.*\.(js))
+- url: /sillyswarm/(.*\.(js))
   static_files: js/\1
   upload: js/(.*\.(js))
   expiration: 5h
 
-- url: /(.*\.(gif|jpg|png))
+- url: /sillyswarm/(.*\.(gif|jpg|png))
   static_files: images/\1
   upload: images/(.*\.(gif|jpg|png))
   expiration: 5h

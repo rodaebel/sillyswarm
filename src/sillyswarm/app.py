@@ -76,6 +76,8 @@ class HandshakeHandler(webapp.RequestHandler):
         player_data = memcache.get_multi(present_players)
 
         for player in player_data:
+            if not player_data[player]:
+                continue
             x, y = player_data[player]
             response = {'state': PLAYER_MOVED, 'player': player, 'x': x, 'y': y}
             websocket.send_message([message.socket], simplejson.dumps(response))
