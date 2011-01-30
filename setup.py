@@ -14,7 +14,7 @@ setup(
     version='1.0.0',
     author="Tobias Rodäbel",
     author_email="tobias.rodaebel@googlemail.com",
-    description="Browser game to demonstrate TyphoonAE's Web Socket handler.",
+    description="Browser game to demonstrate TyphoonAE's Web Socket Service.",
     long_description=(
         read('README.rst')
         + '\n\n' +

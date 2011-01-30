@@ -2,7 +2,7 @@
 Silly Swarm
 ===========
 
-Browser game to demonstrate TyphoonAE's Web Socket handler.
+Browser game to demonstrate TyphoonAE's Web Socket Service.
 
 
 Copyright and License
