@@ -1,0 +1,91 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Silly Swarm</title>
+    <script type="text/javascript" src="sillyswarm.js"></script>
+    <script type="text/javascript">
+
+    var ws;
+
+    // Check whether the Web Socket is ready
+    var checkWebSocketReadyState = function() {
+      if (ws.readyState != 1) {
+        alert("Web Socket not ready!");
+      }
+    };
+
+    function init() {
+
+      var body = document.getElementsByTagName('body')[0];
+
+
+      if ("WebSocket" in window) {
+
+        ws = new WebSocket("{{ websocket_url }}");
+
+        // Handle open event
+        ws.onopen = function(ev) {
+
+          document.onclick = function(ev) {
+
+            ws.send(JSON.stringify({
+              "state": sillyswarm.PLAYER_MOVED,
+              "x": ev.clientX,
+              "y": ev.clientY
+            }));
+          };
+
+          window.onbeforeunload = function() {
+
+            ws.send(JSON.stringify({"state": sillyswarm.PLAYER_LEFT}));
+          };
+
+          // Initialize the Silly Swarm game
+          sillyswarm.init();
+        };
+
+        // Handle Web Socket message
+        ws.onmessage = function(ev) {
+
+          // A message has a state attribute
+          var message = JSON.parse(ev.data);
+
+          switch (message.state) {
+
+            case sillyswarm.HANDSHAKE_RECEIVED: {
+
+              break;
+            };
+
+            case sillyswarm.PLAYER_MOVED: {
+
+              sillyswarm.movePlayer(message, body);
+              break;
+            };
+
+            case sillyswarm.PLAYER_LEFT: {
+
+              sillyswarm.removePlayer(message, body);
+              break;
+            };
+
+          }
+
+        };
+ 
+        // Handle close event
+        ws.onclose = function(ev) {
+        };
+
+        window.setTimeout("checkWebSocketReadyState();", 2000);
+
+      }
+
+    }
+    </script>
+  </head>
+  <body onLoad="init();">
+    <h1>Silly Swarm</h1>
+  </body>
+</html>
