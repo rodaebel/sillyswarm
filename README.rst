@@ -24,6 +24,11 @@ Requirements
 The Google App Engine SDK will be installed by zc.buildout. See the
 buildout.cfg file.
 
+Since Silly Swarm requires TyphoonAE's Web Socket Service, buildout
+automatically patches the SDK. Keep in mind that the productive GAE environment
+does not support the Web Socket Service. See
+http://code.google.com/p/typhoonae/wiki/WebSockets for further information.
+
 Buildout needs Python and the tools contained in /bin and /usr/bin of a
 standard installation of the Linux operating environment. You should ensure
 that these directories are on your PATH and following programs can be found:
@@ -58,15 +63,3 @@ Run the development appserver (from another shell)::
 Then access the application using a web browser with the following URL::
 
   http://localhost:8080/
-
-
-Uploading and Managing
-----------------------
-
-To upload application files, run::
-
-  $ ./bin/appcfg update parts/sillyswarm
-
-For a more detailed documentation follow this url::
-
-  http://code.google.com/appengine/docs/python/tools/uploadinganapp.html
