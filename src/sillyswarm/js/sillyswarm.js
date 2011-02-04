@@ -69,10 +69,20 @@
     y = message.y;
 
     if (player == null) {
+
       player = document.createElement("div");
       player.setAttribute("id", message.player);
-      player.innerHTML = message.player;
+      player.setAttribute("class", "container");
       player.style.position = "absolute";
+
+      img = document.createElement("img");
+      img.setAttribute("alt", message.player);
+      img.setAttribute("class", "player");
+      img.setAttribute("src", "/sillyswarm/busybee.gif");
+      img.setAttribute("title", message.player);
+
+      player.appendChild(img);
+
       body_elem.appendChild(player);
     }
 
@@ -81,8 +91,7 @@
       player = null;
     }
     else {
-      player.style.left = x + "px";
-      player.style.top = y + "px";
+      $("#"+message.player).animate({left: x-50+"px", top: y-50+"px"}, 500);
     }
     
   };

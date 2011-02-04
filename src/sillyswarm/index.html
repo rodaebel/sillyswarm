@@ -3,6 +3,36 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>Silly Swarm</title>
+    <style type="text/css">
+      body {
+        background-image: url(/sillyswarm/background.gif);
+        color: #111;
+        font-family: Helvetica, sans-serif;
+        font-size: 0.7em;
+        overflow: hidden;
+      }
+
+      @-webkit-keyframes spinanimation {
+        0% {
+          -webkit-transform: rotate(0);
+        }
+        100% {
+          -webkit-transform: rotate(360deg);
+        }
+      }
+
+      .container {
+        -webkit-transform-style: preserve-3d;
+        -webkit-animation: spinanimation 5s infinite linear;
+      }
+    
+      img {
+        -webkit-backface-visibility: visible;
+        height: 100px;
+      }
+
+    </style>
+    <script type="text/javascript" src="sillyswarm/jquery.min.js"></script>
     <script type="text/javascript" src="sillyswarm/sillyswarm.js"></script>
     <script type="text/javascript">
 
@@ -86,6 +116,5 @@
     </script>
   </head>
   <body onLoad="init();">
-    <h1>Silly Swarm</h1>
   </body>
 </html>
