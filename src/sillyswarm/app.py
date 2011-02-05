@@ -125,6 +125,23 @@ class MessageHandler(webapp.RequestHandler):
         websocket.broadcast_message(simplejson.dumps(response))
 
 
+class SocketClosedHandler(webapp.RequestHandler):
+    """Handler for socket closed events."""
+
+    def post(self, path):
+
+        players = memcache.get(PLAYERS_INDEX_KEY) or []
+
+        if path in players:
+            players.remove(path)
+            memcache.replace(PLAYERS_INDEX_KEY, players)
+
+        memcache.delete(path)
+
+        response = {'state': PLAYER_LEFT, 'player': path}
+        websocket.broadcast_message(simplejson.dumps(response))
+
+
 class KillallHandler(webapp.RequestHandler):
     """Handler to kill all players at once."""
 
@@ -145,6 +162,7 @@ app = webapp.WSGIApplication([
     ('/', MainHandler),
     ('/_ah/websocket/handshake/(.*)', HandshakeHandler),
     ('/_ah/websocket/message/(.*)', MessageHandler),
+    ('/_ah/websocket/closed/(.*)', SocketClosedHandler),
     ('/killall', KillallHandler),
 ], debug=True)
 
