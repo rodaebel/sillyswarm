@@ -125,10 +125,27 @@ class MessageHandler(webapp.RequestHandler):
         websocket.broadcast_message(simplejson.dumps(response))
 
 
+class KillallHandler(webapp.RequestHandler):
+    """Handler to kill all players at once."""
+
+    def get(self):
+
+        players = memcache.get(PLAYERS_INDEX_KEY) or []
+
+        for player in players:
+            response = {'state': PLAYER_LEFT, 'player': player}
+            websocket.broadcast_message(simplejson.dumps(response))
+            memcache.delete(player)
+            players.remove(player)
+
+        memcache.delete(PLAYERS_INDEX_KEY)
+
+
 app = webapp.WSGIApplication([
     ('/', MainHandler),
     ('/_ah/websocket/handshake/(.*)', HandshakeHandler),
     ('/_ah/websocket/message/(.*)', MessageHandler),
+    ('/killall', KillallHandler),
 ], debug=True)
 
 
