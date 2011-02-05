@@ -107,7 +107,7 @@ class MessageHandler(webapp.RequestHandler):
             replace = {path: [x, y]}
 
             if path not in players:
-                players.append()
+                players.append(path)
                 replace[PLAYERS_INDEX_KEY] = players
 
             memcache.replace_multi(replace)
