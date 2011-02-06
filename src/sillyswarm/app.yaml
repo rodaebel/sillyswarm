@@ -35,5 +35,9 @@ handlers:
   static_files: favicon.ico
   upload: favicon.ico
 
+- url: /_ah/websocket/.*
+  script: app.py
+  login: admin
+
 - url: /.*
   script: app.py
