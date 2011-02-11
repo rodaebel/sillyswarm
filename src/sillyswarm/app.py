@@ -15,7 +15,6 @@
 # limitations under the License.
 """Silly Swarm is a simple multiplayer game using Web Sockets."""
 
-from django.utils import simplejson
 from google.appengine.api import memcache
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template
@@ -24,6 +23,7 @@ from typhoonae import websocket
 from uuid import uuid4 as UUID
 import logging
 import os
+import simplejson
 
 
 # Successfully completed handshake
