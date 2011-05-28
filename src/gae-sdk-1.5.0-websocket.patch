@@ -1,38 +1,39 @@
 diff -r -upN google_appengine/dev_appserver.py google_appengine/dev_appserver.py
---- google_appengine/dev_appserver.py	2010-12-16 00:06:19.000000000 +0100
-+++ google_appengine/dev_appserver.py	2011-01-30 19:35:02.000000000 +0100
-@@ -46,6 +46,8 @@ EXTRA_PATHS = [
+--- google_appengine/dev_appserver.py	2011-05-08 12:09:06.000000000 +0200
++++ google_appengine/dev_appserver.py	2011-05-27 22:10:45.000000000 +0200
+@@ -50,6 +50,9 @@ EXTRA_PATHS = [
    os.path.join(DIR_PATH, 'lib', 'yaml', 'lib'),
    os.path.join(DIR_PATH, 'lib', 'simplejson'),
    os.path.join(DIR_PATH, 'lib', 'graphy'),
++
 +  os.path.join(DIR_PATH, 'lib', 'tornado'),
 +  os.path.join(DIR_PATH, 'lib', 'typhoonae'),
  ]
  
- SCRIPT_EXCEPTIONS = {
+ 
 diff -r -upN google_appengine/google/appengine/tools/dev_appserver.py google_appengine/google/appengine/tools/dev_appserver.py
---- google_appengine/google/appengine/tools/dev_appserver.py	2010-12-16 00:06:19.000000000 +0100
-+++ google_appengine/google/appengine/tools/dev_appserver.py	2011-01-30 19:41:02.000000000 +0100
-@@ -116,6 +116,8 @@ from google.appengine.tools import dev_a
- from google.appengine.tools import dev_appserver_oauth
+--- google_appengine/google/appengine/tools/dev_appserver.py	2011-05-08 12:09:06.000000000 +0200
++++ google_appengine/google/appengine/tools/dev_appserver.py	2011-05-27 22:28:41.000000000 +0200
+@@ -135,6 +135,8 @@ from google.appengine.tools import dev_a
+ from google.appengine.tools import dev_appserver_multiprocess as multiprocess
  from google.appengine.tools import dev_appserver_upload
  
 +from typhoonae.websocket import websocket_stub
 +
  
- PYTHON_LIB_VAR = '$PYTHON_LIB'
- DEVEL_CONSOLE_PATH = PYTHON_LIB_VAR + '/google/appengine/ext/admin'
-@@ -3678,6 +3680,10 @@ def SetupStubs(app_id, **config):
+ 
+ 
+@@ -4573,6 +4575,10 @@ def SetupStubs(app_id, **config):
        channel_service_stub.ChannelServiceStub())
  
    apiproxy_stub_map.apiproxy.RegisterStub(
 +      'websocket',
-+      websocket_stub.WebSocketServiceStub())
++      websocket_stub.WebSocketServiceStub(host=serve_address))
 +
 +  apiproxy_stub_map.apiproxy.RegisterStub(
        'matcher',
-       matcher_stub.MatcherStub(
-           matcher_path,
+       prospective_search_stub.ProspectiveSearchStub(
+           prospective_search_path,
 diff -r -upN google_appengine/google/protobuf/__init__.py google_appengine/google/protobuf/__init__.py
 --- google_appengine/google/protobuf/__init__.py	1970-01-01 01:00:00.000000000 +0100
 +++ google_appengine/google/protobuf/__init__.py	2010-08-23 00:09:50.000000000 +0200
@@ -13539,8 +13540,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/__init__.py goog
 +from websocket import *
 diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py
 --- google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py	1970-01-01 01:00:00.000000000 +0100
-+++ google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py	2011-02-05 11:50:54.000000000 +0100
-@@ -0,0 +1,233 @@
++++ google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py	2011-05-27 22:22:49.000000000 +0200
+@@ -0,0 +1,226 @@
 +# -*- coding: utf-8 -*-
 +#
 +# Copyright 2010, 2011 Tobias Rodäbel
@@ -13556,9 +13557,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 +# See the License for the specific language governing permissions and
 +# limitations under the License.
-+"""Web Socket server implementation which uses tornado."""
++"""TyphoonAE's Web Socket Service backet by Tornado web."""
 +
-+import base64
 +import logging
 +import mimetools
 +import optparse
@@ -13569,7 +13569,6 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +import tornado.web
 +import tornado.websocket
 +import typhoonae.websocket
-+import urllib
 +import urllib2
 +import urlparse
 +
@@ -13580,13 +13579,17 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +
 +WEB_SOCKETS = {}
 +
-+HANDSHAKE = 1 << 0
-+MESSAGE = 1 << 1
-+SOCKET_CLOSED = 1 << 2
++HANDSHAKE = 0
++MESSAGE = 1
++SOCKET_CLOSED = 2
 +
 +HANDSHAKE_URI = '_ah/websocket/handshake'
 +MESSAGE_URI = '_ah/websocket/message'
 +SOCKET_CLOSED_URI = '_ah/websocket/closed'
++
++URIs = {HANDSHAKE: HANDSHAKE_URI,
++        MESSAGE: MESSAGE_URI,
++        SOCKET_CLOSED: SOCKET_CLOSED_URI}
 +
 +
 +def post_multipart(url, fields):
@@ -13627,17 +13630,17 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +
 +    BOUNDARY = mimetools.choose_boundary()
 +    CRLF = u'\r\n'
-+    buffer = []
++    buf = []
 +
 +    for (key, value) in fields:
-+        buffer.append(u'--%s' % BOUNDARY)
-+        buffer.append(u'Content-Disposition: form-data; name="%s"' % key)
-+        buffer.append(u'')
-+        buffer.append(value)
++        buf.append(u'--%s' % BOUNDARY)
++        buf.append(u'Content-Disposition: form-data; name="%s"' % key)
++        buf.append(u'')
++        buf.append(value)
 +
-+    buffer.append(u'--%s--' % BOUNDARY)
-+    buffer.append(u'')
-+    body = CRLF.join(buffer)
++    buf.append(u'--%s--' % BOUNDARY)
++    buf.append(u'')
++    body = CRLF.join(buf)
 +    content_type = u'multipart/form-data; boundary=%s' % BOUNDARY
 +
 +    return content_type, body
@@ -13647,25 +13650,25 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +    """The broadcaster."""
 +
 +    def post(self):
-+        app_id = self.request.headers.get('X-TyphoonAE-AppId')
-+        for id in WEB_SOCKETS[app_id].keys():
++        key = self.request.headers.get('X-TyphoonAE-ServerName')
++        for s in WEB_SOCKETS[key].keys():
 +            try:
-+                WEB_SOCKETS[app_id][id].write_message(self.request.body)
++                WEB_SOCKETS[key][s].write_message(self.request.body)
 +            except IOError:
-+                del WEB_SOCKETS[app_id][id]
++                del WEB_SOCKETS[key][s]
 +
 +
 +class MessageHandler(tornado.web.RequestHandler):
 +    """Receives messages and passes them to web sockets."""
 +
 +    def post(self):
-+        id = self.request.headers.get(typhoonae.websocket.WEBSOCKET_HEADER)
-+        app_id = self.request.headers.get('X-TyphoonAE-AppId')
-+        if id:
++        s = self.request.headers.get(typhoonae.websocket.WEBSOCKET_HEADER)
++        key = self.request.headers.get('X-TyphoonAE-ServerName')
++        if s:
 +            try:
-+                WEB_SOCKETS[app_id][int(id)].write_message(self.request.body)
++                WEB_SOCKETS[key][int(s)].write_message(self.request.body)
 +            except IOError:
-+                del WEB_SOCKETS[app_id][int(id)]
++                del WEB_SOCKETS[key][int(s)]
 +
 +
 +class Dispatcher(threading.Thread):
@@ -13692,14 +13695,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +    def run(self):
 +        """Post message."""
 +
-+        uris = {
-+            HANDSHAKE: HANDSHAKE_URI,
-+            MESSAGE: MESSAGE_URI,
-+            SOCKET_CLOSED: SOCKET_CLOSED_URI
-+        }
-+
 +        url = 'http://%s:%s/%s/%s' % (
-+            self._address, PORT, uris[self._type], self._path)
++            self._address, PORT, URIs[self._type], self._path)
 +
 +        post_multipart(url, [(u'body', self._body), (u'from', self._socket)])
 +
@@ -13712,23 +13709,20 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +
 +    def open(self, param_path):
 +        sock_id = self.stream.socket.fileno()
-+        app_id = base64.b64decode(
-+            re.match(r'^/([a-zA-Z0-9=]+)/.*', self.request.uri).group(1))
-+        if app_id not in WEB_SOCKETS:
-+            WEB_SOCKETS[app_id] = {}
-+        WEB_SOCKETS[app_id][sock_id] = self
-+        address = urlparse.urlsplit(self.request.headers['Origin']).hostname
++        address = self.request.headers['Host'].split(':')[0]
++        if address not in WEB_SOCKETS:
++            WEB_SOCKETS[address] = {}
++        WEB_SOCKETS[address][sock_id] = self
 +        dispatcher = Dispatcher(address, str(sock_id), HANDSHAKE, param_path)
 +        dispatcher.start()
 +
 +    def _dispatch(self, request_type, message=None):
-+        param_path = re.match(r"^/[a-zA-Z0-9=]+/(.*)",
-+                              self.request.uri).group(1)
++        param_path = re.match(r"^/(.*)", self.request.uri).group(1)
 +        if self.stream.socket:
 +            sock_id = str(self.stream.socket.fileno())
 +        else:
 +            sock_id = None
-+        address = urlparse.urlsplit(self.request.headers['Origin']).hostname
++        address = self.request.headers['Host'].split(':')[0]
 +        dispatcher = Dispatcher(
 +            address, sock_id, request_type, param_path, body=message)
 +        dispatcher.start()
@@ -13759,12 +13753,12 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +
 +    PORT = options.internal_port
 +
-+    logging.basicConfig(format=LOG_FORMAT, level=logging.ERROR)
++    logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 +
 +    application = tornado.web.Application([
 +        (r"/broadcast", BroadcastHandler),
 +        (r"/message", MessageHandler),
-+        (r"/[a-zA-Z0-9=]+/(.*)", WebSocketHandler),
++        (r"/(.*)", WebSocketHandler),
 +    ])
 +
 +    http_server = tornado.httpserver.HTTPServer(application)
@@ -13776,7 +13770,7 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +    main()
 diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py
 --- google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py	1970-01-01 01:00:00.000000000 +0100
-+++ google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py	2010-12-12 10:36:57.000000000 +0100
++++ google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py	2011-05-27 22:26:04.000000000 +0200
 @@ -0,0 +1,146 @@
 +# -*- coding: utf-8 -*-
 +#
@@ -13816,7 +13810,7 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py goo
 +
 +WEBSOCKET_HEADER = "X-TyphoonAE-WebSocket"
 +
-+WEBSOCKET_HANDLER_URL = "%(protocol)s://%(host)s:%(port)s/%(app_key)s/%(success_path)s"
++WEBSOCKET_HANDLER_URL = "%(protocol)s://%(host)s:%(port)s/%(success_path)s"
 +
 +
 +class Error(Exception):
@@ -14173,8 +14167,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_servic
 +
 diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.py google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.py
 --- google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.py	1970-01-01 01:00:00.000000000 +0100
-+++ google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.py	2010-12-12 10:36:57.000000000 +0100
-@@ -0,0 +1,150 @@
++++ google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.py	2011-05-27 22:23:52.000000000 +0200
+@@ -0,0 +1,148 @@
 +# -*- coding: utf-8 -*-
 +#
 +# Copyright 2010 Tobias Rodäbel
@@ -14195,10 +14189,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.p
 +from typhoonae import websocket
 +from typhoonae.websocket import websocket_service_pb2
 +
-+import base64
 +import google.appengine.api.apiproxy_stub
 +import httplib
-+import logging
 +import os
 +import re
 +
@@ -14221,7 +14213,7 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.p
 +class WebSocketServiceStub(google.appengine.api.apiproxy_stub.APIProxyStub):
 +    """TyphoonAE's WebSocket service stub."""
 +
-+    def __init__(self, service_name='websocket', port=8888):
++    def __init__(self, host, port=8888, service_name='websocket'):
 +        """Constructor.
 +
 +        Args:
@@ -14229,12 +14221,13 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.p
 +            port: Port number of the Web Socket service.
 +        """
 +        super(WebSocketServiceStub, self).__init__(service_name)
++        self._host = host
 +        self._port = port
 +
 +    def _GetAddress(self):
 +        """Returns service address."""
 +
-+        return "%s:%s" % (self._GetEnviron('SERVER_NAME'), self._port)
++        return "%s:%s" % (self._host, self._port)
 +
 +    @staticmethod
 +    def _GetEnviron(name):
@@ -14266,7 +14259,6 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.p
 +            protocol='ws',
 +            host=self._GetEnviron('SERVER_NAME'),
 +            port=self._port,
-+            app_key=base64.b64encode(self._GetEnviron('APPLICATION_ID')),
 +            success_path=re.sub('^/', '', request.success_path))
 +
 +        response.url = websocket.WEBSOCKET_HANDLER_URL % url_parts
@@ -14280,13 +14272,13 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.p
 +            broadcast: This flag determines whether a message should be sent to
 +                all active sockets but the sender.
 +        """
-+        path = 'message'
 +        if broadcast: path = 'broadcast'
++        else: path = 'message'
 +
 +        conn = httplib.HTTPConnection(self._GetAddress())
 +
 +        headers = {websocket.WEBSOCKET_HEADER: str(socket),
-+                   'X-TyphoonAE-AppId': self._GetEnviron('APPLICATION_ID'),
++                   'X-TyphoonAE-ServerName': self._GetEnviron('SERVER_NAME'),
 +                   'Content-Type': 'text/plain'}
 +
 +        try:
@@ -14327,7 +14319,7 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket_stub.p
 +        response.status.code = status
 diff -r -upN google_appengine/tornado_websocket.py google_appengine/tornado_websocket.py
 --- google_appengine/tornado_websocket.py	1970-01-01 01:00:00.000000000 +0100
-+++ google_appengine/tornado_websocket.py	2010-12-15 13:36:11.000000000 +0100
++++ google_appengine/tornado_websocket.py	2011-05-27 22:08:48.000000000 +0200
 @@ -0,0 +1,52 @@
 +#!/usr/bin/env python
 +# -*- coding: utf-8 -*-
