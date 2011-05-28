@@ -13540,8 +13540,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/__init__.py goog
 +from websocket import *
 diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py
 --- google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py	1970-01-01 01:00:00.000000000 +0100
-+++ google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py	2011-05-27 22:22:49.000000000 +0200
-@@ -0,0 +1,226 @@
++++ google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocket.py	2011-05-28 15:46:38.000000000 +0200
+@@ -0,0 +1,240 @@
 +# -*- coding: utf-8 -*-
 +#
 +# Copyright 2010, 2011 Tobias Rodäbel
@@ -13591,13 +13591,16 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +        MESSAGE: MESSAGE_URI,
 +        SOCKET_CLOSED: SOCKET_CLOSED_URI}
 +
++WEBSOCKET_ORIGIN_HEADER = typhoonae.websocket.WEBSOCKET_ORIGIN_HEADER
 +
-+def post_multipart(url, fields):
++
++def post_multipart(url, fields, add_headers={}):
 +    """Posts multipart form data fields.
 +
 +    Args:
 +        url: Post multipart form data to this URL.
 +        fields: A list of tuples of the form [(fieldname, value), ...].
++        add_headers: Dict of additional headers to be included into the request.
 +    """
 +
 +    content_type, body = encode_multipart_formdata(fields)
@@ -13609,6 +13612,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +               'Cookie': 'dev_appserver_login=test@example.com:True:'
 +                         '185804764220139124118; Path=/',
 +               'Content-Length': str(len(body))}
++
++    headers.update(add_headers)
 +
 +    req = urllib2.Request(url, body, headers)
 +
@@ -13674,7 +13679,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +class Dispatcher(threading.Thread):
 +    """Dispatcher thread for non-blocking message delivery."""
 +
-+    def __init__(self, address, socket, request_type, param_path, body=''):
++    def __init__(self, address, socket, request_type, param_path, headers={},
++                 body=''):
 +        """Constructor.
 +
 +        Args:
@@ -13682,6 +13688,7 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +            socket: String which represents the socket id.
 +            request_type: The request type.
 +            param_path: Parameter path.
++            headers: Dict of headers to be submitted to the request handler.
 +            body: The message body.
 +        """
 +        super(Dispatcher, self).__init__()
@@ -13690,6 +13697,7 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +        self._socket = socket or u''
 +        self._type = request_type
 +        self._path = param_path
++        self._headers = headers
 +        self._body = body or u''
 +
 +    def run(self):
@@ -13698,7 +13706,10 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +        url = 'http://%s:%s/%s/%s' % (
 +            self._address, PORT, URIs[self._type], self._path)
 +
-+        post_multipart(url, [(u'body', self._body), (u'from', self._socket)])
++        post_multipart(
++            url,
++            [(u'body', self._body), (u'from', self._socket)],
++            self._headers)
 +
 +
 +class WebSocketHandler(tornado.websocket.WebSocketHandler):
@@ -13707,24 +13718,27 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +    def __init__(self, *args, **kw):
 +        super(WebSocketHandler, self).__init__(*args, **kw)
 +
-+    def open(self, param_path):
++    def open(self, path):
 +        sock_id = self.stream.socket.fileno()
-+        address = self.request.headers['Host'].split(':')[0]
-+        if address not in WEB_SOCKETS:
-+            WEB_SOCKETS[address] = {}
-+        WEB_SOCKETS[address][sock_id] = self
-+        dispatcher = Dispatcher(address, str(sock_id), HANDSHAKE, param_path)
++        addr = self.request.headers['Host'].split(':')[0]
++        if addr not in WEB_SOCKETS:
++            WEB_SOCKETS[addr] = {}
++        WEB_SOCKETS[addr][sock_id] = self
++        headers = {WEBSOCKET_ORIGIN_HEADER: self.request.headers['Origin']}
++        dispatcher = Dispatcher(
++            addr, str(sock_id), HANDSHAKE, path, headers=headers)
 +        dispatcher.start()
 +
 +    def _dispatch(self, request_type, message=None):
-+        param_path = re.match(r"^/(.*)", self.request.uri).group(1)
++        path = re.match(r"^/(.*)", self.request.uri).group(1)
 +        if self.stream.socket:
 +            sock_id = str(self.stream.socket.fileno())
 +        else:
 +            sock_id = None
-+        address = self.request.headers['Host'].split(':')[0]
++        addr = self.request.headers['Host'].split(':')[0]
++        headers = {WEBSOCKET_ORIGIN_HEADER: self.request.headers['Origin']}
 +        dispatcher = Dispatcher(
-+            address, sock_id, request_type, param_path, body=message)
++            addr, sock_id, request_type, path, headers=headers, body=message)
 +        dispatcher.start()
 +
 +    def on_message(self, message):
@@ -13770,8 +13784,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/tornado_websocke
 +    main()
 diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py
 --- google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py	1970-01-01 01:00:00.000000000 +0100
-+++ google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py	2011-05-27 22:26:04.000000000 +0200
-@@ -0,0 +1,146 @@
++++ google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py	2011-05-28 15:47:23.000000000 +0200
+@@ -0,0 +1,149 @@
 +# -*- coding: utf-8 -*-
 +#
 +# Copyright 2010 Tobias Rodäbel
@@ -13800,6 +13814,7 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py goo
 +
 +__all__ = [
 +    'WEBSOCKET_HEADER',
++    'WEBSOCKET_ORIGIN_HEADER',
 +    'WEBSOCKET_HANDLER_URL',
 +    'BadArgumentError',
 +    'create_websocket_url',
@@ -13809,6 +13824,8 @@ diff -r -upN google_appengine/lib/typhoonae/typhoonae/websocket/websocket.py goo
 +]
 +
 +WEBSOCKET_HEADER = "X-TyphoonAE-WebSocket"
++
++WEBSOCKET_ORIGIN_HEADER = "WebSocket-Origin"
 +
 +WEBSOCKET_HANDLER_URL = "%(protocol)s://%(host)s:%(port)s/%(success_path)s"
 +
