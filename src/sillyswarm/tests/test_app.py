@@ -40,7 +40,7 @@ class test_handlers(unittest.TestCase):
 
         if not apiproxy_stub_map.apiproxy.GetStub('websocket'):
             # Initialize Web Socket Service
-            websocket = websocket_stub.WebSocketServiceStub()
+            websocket = websocket_stub.WebSocketServiceStub('localhost')
             apiproxy_stub_map.apiproxy.RegisterStub('websocket', websocket)
 
     def test_index(self):
